@@ -69,7 +69,7 @@ $(document).ready(function(a){
 			// return question and options
 			var r = {
 				question: q,
-				options: options
+				options: JSON.stringify({options: options})
 			};
 
 			return r;

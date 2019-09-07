@@ -4,8 +4,8 @@ import json
 import pusher
 from datetime import datetime
 
-from db import db_session
-from models import Coord
+from db import db_session, init_db
+from models import Poll
 
 app = Flask(__name__)
 
@@ -19,9 +19,6 @@ def index():
 # poll page
 @app.route('/poll')
 def poll():
-	pid = request.args.get('pid')
-	print(pid)
-
 	return render_template('poll.html')
 
 
@@ -34,15 +31,20 @@ def poll():
 # generate new poll from home page
 @app.route('/api/generate', methods=["POST"])
 def generate():
+
 	# get password, questino and options from POST data
 	question = request.form.get("question")
-	options = request.form.get("options")
+	options = json.loads(request.form.get("options"))["options"]
 	password = request.form.get("password")
 
 	# generate entry and new url pid
-
+	poll = Poll(question, options, password)
+	db_session.add(poll)
+	db_session.flush()
+	db_session.commit()
+	
 	# return url pid
-	resp = jsonify(pid = "123")
+	resp = jsonify(pid = poll.pid)
 	resp.headers['Access-Control-Allow-Origin'] = '*'
 	return resp
 
@@ -59,12 +61,15 @@ def notifyMove():
 # get poll data
 @app.route('/api/poll')
 def getPoll():
-	d = {
-		"question": "What's the question?", 
-		"options": ["Test1", "Test2", "Test3", "Test4", "Test5", "Test6"]
-	}
+	p = request.args.get("pid")
+
+	# get by pid
+	q, o = db_session.query(Poll.question, Poll.options).filter_by(pid=p).first()
 	
-	resp = jsonify(data = d)
+	resp = jsonify(data = {
+			"question": q,
+			"options": o.split("|")
+		})
 	resp.headers['Access-Control-Allow-Origin'] = '*'
 	return resp
 

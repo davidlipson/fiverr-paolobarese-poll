@@ -1,6 +1,9 @@
 $(document).ready(function(a){
-	$.get("/api/poll")
+	var urlParams = new URLSearchParams(window.location.search)
+	$.get("/api/poll?pid=" + urlParams.get("pid"))
 		.done(function(data){
+
+			console.log(data);
 
 			// load poll information
 			var question = data.data.question;
