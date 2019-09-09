@@ -1,13 +1,27 @@
 from flask import Flask, request, jsonify, render_template, redirect
 import os
 import json
-import pusher
+import math
+from pusher import Pusher
 from datetime import datetime
+from sqlalchemy import and_
 
 from db import db_session, init_db
 from models import Poll
 
 app = Flask(__name__)
+
+
+# PUSHER setup
+pusher = Pusher(
+	app_id = "855194",
+	key = "918ee8d39b9cdd619aeb",
+	secret = "2d29133b7be707d6649f",
+	cluster = "us2",
+	ssl = True
+)
+
+#######################################################################
 
 # ENDPOINTS
 
@@ -52,11 +66,34 @@ def generate():
 @app.route('/api/notifyMove', methods=["POST"])
 def notifyMove():
 	#must also store the actual mouse value and check always that it hasn't been voted completely
+	offsetX = request.form.get("offsetX")
+	offsetY = request.form.get("offsetY")
 	x = request.form.get("x")
 	y = request.form.get("y")
-	resp = jsonify(offset = {"x": int(x), "y": int(y)})
-	resp.headers['Access-Control-Allow-Origin'] = '*'
-	return resp
+	pid = request.form.get("pid")
+
+	poll = db_session.query(Poll).filter_by(pid=pid).first()
+	if(poll.started and not poll.completed):
+		poll.x = poll.x + int(offsetX)
+		poll.y = poll.y + int(offsetY)
+
+		# calculate a win
+		# poll.complete = 
+		db_session.commit()
+
+
+		# push notification
+		#if (math.sqrt((poll.x - int(x))**2 + (poll.y - int(y))**2) > 50):
+		pusher.trigger(pid, "notify-move", {"x": poll.x, "y": poll.y})
+		
+		# get rid of this in response?
+		resp = jsonify(new_point = {"x": poll.x, "y": poll.y})	
+		resp.headers['Access-Control-Allow-Origin'] = '*'
+		return resp, 200
+
+	else:
+		return "Unable to vote at this time.", 400
+
 
 # get poll data
 @app.route('/api/poll')
@@ -64,14 +101,66 @@ def getPoll():
 	p = request.args.get("pid")
 
 	# get by pid
-	q, o = db_session.query(Poll.question, Poll.options).filter_by(pid=p).first()
-	
-	resp = jsonify(data = {
-			"question": q,
-			"options": o.split("|")
-		})
-	resp.headers['Access-Control-Allow-Origin'] = '*'
-	return resp
+	try:
+		poll = db_session.query(Poll).filter_by(pid=p).first()
+		
+		resp = jsonify(
+			data = {
+				"question": poll.question,
+				"options": poll.options.split("|"),
+				"x": poll.x,
+				"y": poll.y,
+				"status": "COMPLETED" if poll.completed else ("STARTED" if poll.started else "WAITING")
+			}
+		)
+
+		resp.headers['Access-Control-Allow-Origin'] = '*'
+		return resp, 200
+
+	except:
+		return "This poll does not seem to exist.", 400
+
+# start vote
+@app.route('/api/start')
+def start():
+	pid = request.args.get("pid")
+	password = request.args.get("password")
+
+	# get by pid
+	try:
+		poll = db_session.query(Poll).filter_by(pid=pid).filter_by(password=password).first()
+		poll.started = True
+		db_session.commit()
+
+		#push message saying owner started
+		pusher.trigger(pid, "notify-status", {"status": "COMPLETED" if poll.completed else ("STARTED" if poll.started else "WAITING")})
+
+		return "Poll started", 200
+
+	except Exception as e:
+		return "Invalid pid or password.", 400
+
+# stop vote
+@app.route('/api/stop')
+def stop():
+	pid = request.args.get("pid")
+	password = request.args.get("password")
+
+	# get by pid
+	try:
+		poll = db_session.query(Poll).filter_by(pid=pid).filter_by(password=password).first()
+		poll.completed = True
+		db_session.commit()
+		#this is more like a stop-by-owner, push message saying owner stopped
+		
+		#push message saying owner started
+		pusher.trigger(pid, "notify-status", {"status": "COMPLETED"})
+
+		return "Poll completed", 200
+
+	except:
+		return "Invalid pid or password.", 400
+
 
 
 # run Flask app

@@ -11,18 +11,20 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 
-
     <link type="text/css" rel="stylesheet" href="static/css/stylesheet.css">
+    <script src="https://js.pusher.com/4.1/pusher.min.js"></script>
 
   </head>
   <body>
     <div class="main-body">
+    <div class="login-div"><button id="start-button" type="button">Start</button><button id="stop-button" type="button">Complete</button>
+      <div id="status-bar"></div></div>
     <div class="poll-body">
         <div class="question-body">
           Poll: <span class="query-text"></span>
         </div>
         <div class="options-body">
-          <canvas width="550" height="550"></canvas>
+          <canvas width="600" height="600"></canvas>
         </div>
     </div>
     </div>

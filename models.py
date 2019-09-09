@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
 from db import Base
 from datetime import datetime
 import time
@@ -23,12 +23,20 @@ class Poll(Base):
     question = Column(Text)
     options = Column(Text)
     password = Column(Text)
+    x = Column(Integer)
+    y = Column(Integer)
+    started = Column(Boolean)
+    completed = Column(Boolean)
 
-    def __init__(self, question="", options=[], password=""):
+    def __init__(self, question="", options=[], password="", x=300, y=300):
         self.question = question
         self.options = ("|").join([o.replace("|", ":") for o in options if o != ""])
         self.password = password
         self.pid = int(time.time())
+        self.x = x
+        self.y = y
+        self.started = False
+        self.completed = False
 
     def __repr__(self):
-        return '<Poll (%s, %s)>' % (self.question, self.options)
+        return '<Poll (%s, %s, %d, %d)>' % (self.question, self.options, self.x, self.y)

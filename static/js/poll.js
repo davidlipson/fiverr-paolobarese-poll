@@ -1,23 +1,25 @@
 $(document).ready(function(a){
 	var urlParams = new URLSearchParams(window.location.search)
-	$.get("/api/poll?pid=" + urlParams.get("pid"))
-		.done(function(data){
+	var pid = urlParams.get("pid");
 
-			console.log(data);
+	$.get("/api/poll?pid=" + pid)
+		.done(function(data){
 
 			// load poll information
 			var question = data.data.question;
 			var options = data.data.options;
 
 			$(".query-text").html(question);
+			$("#status-bar").html(data.data.status)
 
 			// setup canvas
 			var canvas = $("canvas");
 			var ctx = canvas[0].getContext("2d");
 			var radius = canvas[0].height/2 - 15;
+			var smallRadius = radius - 50;
 
 			// actual point of vote
-			var point = {x: canvas[0].width/2, y: canvas[0].height/2};
+			var point = {x: data.data.x, y: data.data.y};
 
 			// start/mousedown coord
 			var start = {x: canvas[0].width/2, y: canvas[0].height/2};
@@ -28,7 +30,55 @@ $(document).ready(function(a){
 			// if mouse clicked/moving
 			var clicked = false;
 
+			// setup pusher connections
+			const pusher = new Pusher("918ee8d39b9cdd619aeb", {
+				cluster: "us2",
+				encrypted: true
+			});
+
+			const channel = pusher.subscribe(pid);
+			channel.bind("notify-move", handleMove);
+			channel.bind("notify-status", handleStatus);
+
+
+			function handleMove(data){
+				point.x = data.x;
+				point.y = data.y;
+				redraw();
+			}
+
+			function handleStatus(data){
+				$("#status-bar").html(data.status)
+			}
+
 			redraw();
+
+			$("#start-button").click(function(a){
+				var pass = prompt("Please enter the password to start:");
+
+				if(pass != null){
+					$.get("/api/start?pid=" + pid + "&password=" + pass)
+						.done(function(data){
+							console.log(data);
+						})
+						.fail(function(){
+							alert("Invalid password.");
+						})
+				}
+			})
+
+			$("#stop-button").click(function(a){
+				var pass = prompt("Please enter the password to start:");
+				if(pass != null){
+					$.get("/api/stop?pid=" + pid + "&password=" + pass)
+						.done(function(data){
+							console.log(data);
+						})
+						.fail(function(){
+							alert("Invalid password.");
+						})
+				}
+			})
 
 			/////////////////// Mouse movement functionality /////////////////
 
@@ -72,6 +122,7 @@ $(document).ready(function(a){
 
 				// calculate current angle and quadrant
 				var current_angle = Math.atan2(point.y-canvas[0].height/2, point.x-canvas[0].width/2);
+				var current_dist = Math.sqrt((point.y - canvas[0].height/2)**2 + (point.x - canvas[0].width/2)**2)
 				if(current_angle < 0) current_angle = Math.PI * 2 + current_angle;
 				
 			    for(var i = 0; i < options.length; i = i + 1) {
@@ -79,9 +130,9 @@ $(document).ready(function(a){
 			    	var beginAngle = angle * i;
 				    var endAngle = beginAngle + angle;
 				    var medianAngle = (endAngle + beginAngle) / 2;
-				    console.log(beginAngle, current_angle, medianAngle, options[i]);
 				    ctx.beginPath();
-				    ctx.fillStyle = (current_angle >= beginAngle && current_angle < endAngle) ? "yellow" : "white";
+				    ctx.fillStyle = (current_angle >= beginAngle && current_angle < endAngle) ? 
+				    				(current_dist > smallRadius ? "red" : "yellow") : "white";
 				    ctx.moveTo(canvas[0].width/2, canvas[0].height/2);
 				    ctx.arc(canvas[0].width/2, canvas[0].height/2, radius, beginAngle, endAngle);
 				    ctx.lineTo(canvas[0].width/2, canvas[0].height/2);
@@ -96,27 +147,33 @@ $(document).ready(function(a){
 			    	var beginAngle = angle * i;
 				    var endAngle = beginAngle + angle;
 				    var medianAngle = (endAngle + beginAngle) / 2;
-				    console.log(radius * Math.cos(beginAngle), radius * Math.sin(beginAngle));
 					ctx.fillText(options[i], radius * Math.cos(medianAngle) + canvas[0].width/2, radius * Math.sin(medianAngle) + canvas[0].height/2);
 				}
+
+				ctx.beginPath();
+				ctx.arc(canvas[0].width/2, canvas[0].height/2, smallRadius, 0, 2 * Math.PI);
+				ctx.stroke();
 
 				// point
 				ctx.fillRect(point.x - 5, point.y - 5, 10, 10);
 			}
 			function notifyMove(){
-				$.post("/api/notifyMove", {x: offset.x, y: offset.y})
+				$.post("/api/notifyMove", {offsetX: offset.x, offsetY: offset.y, pid: pid, x: point.x, y: point.y})
 					.done(function(data){
-						point.x += data.offset.x;
-						point.y += data.offset.y;
+						point.x = data.new_point.x;
+						point.y = data.new_point.y;
+						console.log(data);
 					})
 					.fail(function(){
-						console.log("Notify Move Failed.")
+						alert("Cannot vote at this time.");
+						clicked = false;
 					});
 			}
 
 		})
 		.fail(function(){
-			alert("There was an error loading this poll.")
+			alert("There was an error loading this poll.");
+			window.location = "/";
 		});
 
 	

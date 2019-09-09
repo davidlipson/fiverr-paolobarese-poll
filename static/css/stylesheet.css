@@ -1,5 +1,5 @@
 .main-body{
-	width: 600px;
+	width: 650px;
     display: block;
     margin: 0 auto;
     margin-top: 50px;
@@ -71,4 +71,25 @@ button{
 
 canvas{
     margin-bottom: 10px;
+}
+
+.login-div{
+    margin-bottom: 25px;
+    display: flex;
+}
+
+.login-div button{
+    margin: 0;
+    float: none;
+    margin-left: 25px;
+    border: 1px solid black !important;
+    height: 30px;
+}
+
+#status-bar{
+    float: right;
+    width: 100%;
+    text-align: right;
+    padding-top: 5px;
+    height: 30px;
 }
