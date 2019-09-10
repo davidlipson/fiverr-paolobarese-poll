@@ -78,6 +78,13 @@ def notifyMove():
 		poll.y = poll.y + int(offsetY)
 
 		# calculate a win
+		# complete if distance is greater than small radius
+		dist = math.sqrt((poll.y - 300)**2 + (poll.x - 300)**2)
+		if(dist > 245):
+			print("COMPLETED")
+			poll.completed = True
+			pusher.trigger(pid, "notify-status", {"status": "COMPLETED"})
+
 		# poll.complete = 
 		db_session.commit()
 
@@ -103,6 +110,7 @@ def getPoll():
 	# get by pid
 	try:
 		poll = db_session.query(Poll).filter_by(pid=p).first()
+
 		
 		resp = jsonify(
 			data = {
@@ -110,6 +118,7 @@ def getPoll():
 				"options": poll.options.split("|"),
 				"x": poll.x,
 				"y": poll.y,
+				"viewers": poll.viewers,
 				"status": "COMPLETED" if poll.completed else ("STARTED" if poll.started else "WAITING")
 			}
 		)
@@ -117,7 +126,8 @@ def getPoll():
 		resp.headers['Access-Control-Allow-Origin'] = '*'
 		return resp, 200
 
-	except:
+	except Exception as e:
+		print(e)
 		return "This poll does not seem to exist.", 400
 
 # start vote
@@ -162,6 +172,33 @@ def stop():
 		return "Invalid pid or password.", 400
 
 
+# track leaving
+@app.route('/api/enter')
+def enter():
+	pid = request.args.get("pid")
+	
+	# minus one viewer
+	poll = db_session.query(Poll).filter_by(pid=pid).first()
+	poll.viewers = poll.viewers + 1
+
+	pusher.trigger(pid, "notify-viewers", {"total": poll.viewers})
+	db_session.commit()
+
+	return "Ok.", 200
+
+# track leaving
+@app.route('/api/leave')
+def leave():
+	pid = request.args.get("pid")
+	
+	# minus one viewer
+	poll = db_session.query(Poll).filter_by(pid=pid).first()
+	poll.viewers = max(poll.viewers - 1, 0)
+
+	pusher.trigger(pid, "notify-viewers", {"total": poll.viewers})
+	db_session.commit()
+
+	return "Ok.", 200
 
 # run Flask app
 @app.teardown_appcontext
