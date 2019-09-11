@@ -17,7 +17,10 @@
   </head>
   <body>
     <div class="main-body">
-    <div class="login-div"><button id="start-button" type="button">Start</button><button id="stop-button" type="button">Complete</button>
+    <div class="login-div">
+      <button id="start-button" type="button">Start</button>
+      <button id="stop-button" type="button">Complete</button>
+      <button id="reset-button" type="button">Reset</button>
       <div id="status-bar"></div></div>
     <div class="poll-body">
         <div class="question-body">
@@ -27,6 +30,14 @@
           <canvas width="600" height="600"></canvas>
         </div>
     </div>
+    <div class="winners-div"><label>Winners</label>
+      <ul class="winners-list"></ul>
+    </div>
+    <!--<div class="voters-div"><label>Voters</label>
+      <input type="text" placeholder="Join voting list...">
+      <button id="reset-button" type="button">Join</button>
+      <ul class="voters-list"></ul>
+    </div>-->
     <div class="users-div"><label># of Voters: </label><div id="n-voters"></div></div>
     </div>
     <script src="static/js/poll.js"></script>

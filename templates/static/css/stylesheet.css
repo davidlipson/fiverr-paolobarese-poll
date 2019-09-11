@@ -93,3 +93,40 @@ canvas{
     padding-top: 5px;
     height: 30px;
 }
+
+.users-div{
+    display: flex;
+}
+
+#n-voters{
+    margin-left: 25px;
+}
+
+.winners-list{
+    list-style: none;
+    padding: 0;
+}
+
+.winners-div{
+    position: absolute;
+    top: 50px;
+    left: 50px;
+}
+
+.winners-div label{
+    font-weight: bold;
+}
+
+.voters-div input{
+    margin-left: 25px;
+}
+
+.voters-div{
+    position: absolute;
+    top: 25px;
+    right: 50px;
+}
+
+.voters-div ul{
+    list-style: none;
+}

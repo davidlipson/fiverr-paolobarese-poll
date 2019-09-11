@@ -5,35 +5,73 @@ $(document).ready(function(a){
 	$.get("/api/poll?pid=" + pid)
 		.done(function(data){
 
-			// load poll information
-			var question = data.data.question;
-			var options = data.data.options;
-			var status = data.data.status;
-
-			$(".query-text").html(question);
-			$("#status-bar").html(data.data.status)
-			$("#n-voters").html(data.data.viewers);
-
 			// setup canvas
 			var canvas = $("canvas");
 			var ctx = canvas[0].getContext("2d");
 			var radius = canvas[0].height/2 - 15;
 			var smallRadius = radius - 50;
 
+			// load poll information
+			var question = "";
+			var options = "";
+			var status = "";
+
 			// actual point of vote
-			var point = {x: data.data.x, y: data.data.y};
+			var point = {};
 
 			// point on mouse down or notification
-			var lastPoint = {x: data.data.x, y: data.data.y};
+			var lastPoint = {};
 
 			// start/mousedown coord
-			var start = {x: canvas[0].width/2, y: canvas[0].height/2};
+			var start = {};
 
 			// offset from start
-			var offset = {x: canvas[0].width/2, y: canvas[0].height/2};
+			var offset = {};
 
 			// if mouse clicked/moving
 			var clicked = false;
+
+			init(data.data);
+
+			function init(data){
+
+				question = data.question;
+				options = data.options;
+				status = data.status;
+
+				$(".query-text").html(data.question);
+				$("#status-bar").html(data.status);
+				$("#n-voters").html(data.viewers);
+				updateWinners(data.winners);
+
+				// actual point of vote
+				point = {x: data.x, y: data.y};
+
+				// point on mouse down or notification
+				lastPoint = {x: data.x, y: data.y};
+
+				// start/mousedown coord
+				start = {x: canvas[0].width/2, y: canvas[0].height/2};
+
+				// offset from start
+				offset = {x: canvas[0].width/2, y: canvas[0].height/2};
+
+				// if mouse clicked/moving
+				clicked = false;
+
+				redraw();
+
+			}
+
+			function updateWinners(winners){
+				$(".winners-list").empty();
+				winners.forEach(function(w){
+					var li = $("<li></li>");
+					li.html(w);
+					$(".winners-list").append(li);
+				});
+			}
+
 
 			// setup pusher connections
 			const pusher = new Pusher("918ee8d39b9cdd619aeb", {
@@ -45,9 +83,14 @@ $(document).ready(function(a){
 			channel.bind("notify-move", handleMove);
 			channel.bind("notify-status", handleStatus);
 			channel.bind("notify-viewers", handleViewers);
+			channel.bind("notify-reset", handleReset);
 
 			function handleViewers(data){
 				$("#n-voters").html(data.total);
+			}
+
+			function handleReset(data){
+				init(data);
 			}
 
 			function handleMove(data){
@@ -62,10 +105,11 @@ $(document).ready(function(a){
 			function handleStatus(data){
 				status = data.status;
 				$("#status-bar").html(data.status)
-				if(data.status == "COMPLETED") leave();
+				if(data.status == "COMPLETED"){
+					leave();
+					updateWinners(data.winners);
+				} 
 			}
-
-			redraw();
 
 			$("#start-button").click(function(a){
 				var pass = prompt("Please enter the password to start:");
@@ -82,6 +126,16 @@ $(document).ready(function(a){
 				var pass = prompt("Please enter the password to start:");
 				if(pass != null){
 					$.get("/api/stop?pid=" + pid + "&password=" + pass)
+						.fail(function(){
+							alert("Invalid password.");
+						})
+				}
+			})
+
+			$("#reset-button").click(function(a){
+				var pass = prompt("Please enter the password to start:");
+				if(pass != null){
+					$.get("/api/reset?pid=" + pid + "&password=" + pass)
 						.fail(function(){
 							alert("Invalid password.");
 						})
@@ -162,7 +216,7 @@ $(document).ready(function(a){
 				    var medianAngle = (endAngle + beginAngle) / 2;
 				    ctx.beginPath();
 				    ctx.fillStyle = (current_angle >= beginAngle && current_angle < endAngle) ? 
-				    				(current_dist > smallRadius ? "red" : "yellow") : "white";
+				    				(current_dist > smallRadius && status == "COMPLETED" ? "red" : "yellow") : "white";
 				    ctx.moveTo(canvas[0].width/2, canvas[0].height/2);
 				    ctx.arc(canvas[0].width/2, canvas[0].height/2, radius, beginAngle, endAngle);
 				    ctx.lineTo(canvas[0].width/2, canvas[0].height/2);

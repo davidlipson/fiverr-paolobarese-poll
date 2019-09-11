@@ -28,8 +28,9 @@ class Poll(Base):
     started = Column(Boolean)
     completed = Column(Boolean)
     viewers = Column(Integer)
+    winners = Column(Text)
 
-    def __init__(self, question="", options=[], password="", x=300, y=300, viewers=0):
+    def __init__(self, question="", options=[], password="", x=300, y=300, viewers=0, winners=""):
         self.question = question
         self.options = ("|").join([o.replace("|", ":") for o in options if o != ""])
         self.password = password
@@ -39,6 +40,7 @@ class Poll(Base):
         self.started = False
         self.completed = False
         self.viewers = viewers
+        self.winners = winners
 
     def __repr__(self):
         return '<Poll (%s, %s, %d, %d)>' % (self.question, self.options, self.x, self.y)

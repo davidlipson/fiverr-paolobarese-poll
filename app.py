@@ -80,14 +80,32 @@ def notifyMove():
 		# calculate a win
 		# complete if distance is greater than small radius
 		dist = math.sqrt((poll.y - 300)**2 + (poll.x - 300)**2)
-		if(dist > 245):
+		if(dist > 240):
 			print("COMPLETED")
 			poll.completed = True
-			pusher.trigger(pid, "notify-status", {"status": "COMPLETED"})
 
-		# poll.complete = 
+
+			# determine winner and add to list of winners
+			options = poll.options.split("|")
+			angle = float(math.atan2(poll.y - 300, poll.x-300))
+			if(angle < 0):
+				angle = math.pi * 2 + angle
+
+			a = float(math.pi * 2) / len(options)
+			print(angle, a)
+			winner = "__UNKNOWN__"
+			for index, o in enumerate(options):
+				begin = a * index
+				end = begin + a
+				if (angle >= begin and angle < end):
+					winner = o
+					break
+
+			poll.winners = poll.winners + winner + "|"
+
+			pusher.trigger(pid, "notify-status", {"status": "COMPLETED", "winners": poll.winners.split("|")})
+
 		db_session.commit()
-
 
 		# push notification
 		#if (math.sqrt((poll.x - int(x))**2 + (poll.y - int(y))**2) > 50):
@@ -119,6 +137,7 @@ def getPoll():
 				"x": poll.x,
 				"y": poll.y,
 				"viewers": poll.viewers,
+				"winners": poll.winners.split("|"),
 				"status": "COMPLETED" if poll.completed else ("STARTED" if poll.started else "WAITING")
 			}
 		)
@@ -171,6 +190,38 @@ def stop():
 	except:
 		return "Invalid pid or password.", 400
 
+# reset poll
+@app.route('/api/reset')
+def reset():
+	pid = request.args.get("pid")
+	password = request.args.get("password")
+
+	# get by pid
+	try:
+		poll = db_session.query(Poll).filter_by(pid=pid).filter_by(password=password).first()
+		poll.completed = False
+		poll.started = False
+		poll.viewers = 0 
+		poll.x = 300
+		poll.y = 300
+
+		db_session.commit()
+		
+		#push message saying owner restarted
+		pusher.trigger(pid, "notify-reset", {
+			"question": poll.question,
+			"options": poll.options.split("|"),
+			"x": poll.x, 
+			"y": poll.y, 
+			"viewers": poll.viewers,
+			"winners": poll.winners.split("|"),
+			"status": "COMPLETED" if poll.completed else ("STARTED" if poll.started else "WAITING")
+		})
+
+		return "Poll reset", 200
+
+	except:
+		return "Invalid pid or password.", 400
 
 # track leaving
 @app.route('/api/enter')
