@@ -44,7 +44,6 @@ def poll():
 
 ## used as timer; every 0.3 seconds updates survey.
 def pulseNotify():
-	print("test")
 	# notify each active survey to update
 	r = db_session.query(Poll).filter_by(started=True).filter_by(completed=False).all()
 	for p in r:
@@ -300,7 +299,8 @@ def leave():
 def shutdown_session(exception=None):
     db_session.remove()
 
-if __name__ == "__main__":
-	pulseNotify()
-	app.run()
+pulseNotify()
+
+#if __name__ == "__main__":
+#	app.run()
 
