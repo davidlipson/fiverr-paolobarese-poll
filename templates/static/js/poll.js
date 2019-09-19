@@ -16,6 +16,9 @@ $(document).ready(function(a){
 			var options = "";
 			var status = "";
 
+			// voter info
+			var vid = null;
+
 			// actual point of vote
 			var point = {};
 
@@ -38,6 +41,8 @@ $(document).ready(function(a){
 				question = data.question;
 				options = data.options;
 				status = data.status;
+
+				if("vid" in data) vid = data.vid;
 
 				$(".query-text").html(data.question);
 				$("#status-bar").html(data.status);
@@ -84,6 +89,11 @@ $(document).ready(function(a){
 			channel.bind("notify-status", handleStatus);
 			channel.bind("notify-viewers", handleViewers);
 			channel.bind("notify-reset", handleReset);
+			channel.bind("notify-send-update", handleSend);
+
+			function handleSend(){
+				console.log("notified");
+			}
 
 			function handleViewers(data){
 				$("#n-voters").html(data.total);
@@ -106,6 +116,7 @@ $(document).ready(function(a){
 				status = data.status;
 				$("#status-bar").html(data.status)
 				if(data.status == "COMPLETED"){
+					redraw();
 					leave();
 					updateWinners(data.winners);
 				} 
@@ -168,7 +179,7 @@ $(document).ready(function(a){
 
 					redraw();
 
-					if(Math.sqrt((point.x - lastPoint.x)**2 + (point.y - lastPoint.y)**2) > 20){
+					if(Math.sqrt((point.x - lastPoint.x)**2 + (point.y - lastPoint.y)**2) > 10){
 						notifyMove(point.x - lastPoint.x,  point.y - lastPoint.y);
 						lastPoint.x = point.x;
 						lastPoint.y = point.y;
@@ -243,7 +254,7 @@ $(document).ready(function(a){
 			}
 
 			function notifyMove(offsetX, offsetY){
-				$.post("/api/notifyMove", {offsetX: offsetX, offsetY: offsetY, pid: pid, x: point.x, y: point.y})
+				$.post("/api/notifyMove", {offsetX: offsetX, offsetY: offsetY, pid: pid, vid: vid, x: point.x, y: point.y})
 					.fail(function(){
 						leave();
 					});

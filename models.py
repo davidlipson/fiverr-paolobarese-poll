@@ -1,20 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
 from db import Base
 from datetime import datetime
 import time
-
-class Coord(Base):
-    __tablename__ = "coords"
-    id = Column(Integer, primary_key=True)
-    x = Column(Integer)
-    y = Column(Integer)
-
-    def __init__(self, x=0, y=0):
-        self.x = x
-        self.y = y
-
-    def __repr__(self):
-        return '<Coord (%d, %d)>' % (self.x, self.y)
 
 class Poll(Base):
     __tablename__ = "polls"
@@ -29,6 +17,7 @@ class Poll(Base):
     completed = Column(Boolean)
     viewers = Column(Integer)
     winners = Column(Text)
+    voters = relationship("Voter")
 
     def __init__(self, question="", options=[], password="", x=300, y=300, viewers=0, winners=""):
         self.question = question
@@ -44,3 +33,18 @@ class Poll(Base):
 
     def __repr__(self):
         return '<Poll (%s, %s, %d, %d)>' % (self.question, self.options, self.x, self.y)
+
+class Voter(Base):
+    __tablename__ = "voters"
+    id = Column(Integer, primary_key=True)
+    poll_id = Column(Integer, ForeignKey("polls.id"))
+    x = Column(Integer)
+    y = Column(Integer)
+
+    def __init__(self, poll_id, x=300, y=300):
+        self.poll_id = poll_id
+        self.x = x
+        self.y = y
+
+    def __repr__(self):
+        return '<Voter (%d, %d)>' % (self.x, self.y)

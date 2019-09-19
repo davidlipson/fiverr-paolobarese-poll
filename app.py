@@ -5,9 +5,10 @@ import math
 from pusher import Pusher
 from datetime import datetime
 from sqlalchemy import and_
+import time, threading
 
 from db import db_session, init_db
-from models import Poll
+from models import Poll, Voter
 
 app = Flask(__name__)
 
@@ -41,6 +42,62 @@ def poll():
 
 # API
 
+## used as timer; every 0.3 seconds updates survey.
+def pulseNotify():
+	# notify each active survey to update
+	r = db_session.query(Poll).filter_by(started=True).filter_by(completed=False).all()
+	for p in r:
+		# voters
+		voters = db_session.query(Voter).filter_by(poll_id=p.id).all()
+		
+		# get sum of offsets
+		offsetX = 0
+		offsetY = 0
+
+		for v in voters:
+			offsetX = offsetX + (v.x - p.x)
+			offsetY = offsetY + (v.y - p.y)
+
+		# reset poll to new location
+		p.x = p.x + offsetX
+		p.y = p.y + offsetY
+
+		for v in voters:
+			v.x = p.x
+			v.y = p.y
+
+		db_session.commit()
+
+		pusher.trigger(str(p.pid), "notify-move", {"x": p.x, "y": p.y})
+
+
+		# calculate a win
+		# complete if distance is greater than small radius
+		dist = math.sqrt((p.y - 300)**2 + (p.x - 300)**2)
+		if(dist > 240):
+			p.completed = True
+
+			# determine winner and add to list of winners
+			options = p.options.split("|")
+			angle = float(math.atan2(p.y - 300, p.x-300))
+			if(angle < 0):
+				angle = math.pi * 2 + angle
+
+			a = float(math.pi * 2) / len(options)
+			winner = "__UNKNOWN__"
+			for index, o in enumerate(options):
+				begin = a * index
+				end = begin + a
+				if (angle >= begin and angle < end):
+					winner = o
+					break
+
+			p.winners = p.winners + winner + "|"
+
+			db_session.commit()
+			pusher.trigger(str(p.pid), "notify-status", {"status": "COMPLETED", "winners": p.winners.split("|")})
+
+	threading.Timer(0.3, pulseNotify).start()
 
 # generate new poll from home page
 @app.route('/api/generate', methods=["POST"])
@@ -71,48 +128,22 @@ def notifyMove():
 	x = request.form.get("x")
 	y = request.form.get("y")
 	pid = request.form.get("pid")
+	vid = request.form.get("vid")
 
 	poll = db_session.query(Poll).filter_by(pid=pid).first()
+	voter = db_session.query(Voter).filter_by(id=vid).first()
 	if(poll.started and not poll.completed):
-		poll.x = poll.x + int(offsetX)
-		poll.y = poll.y + int(offsetY)
-
-		# calculate a win
-		# complete if distance is greater than small radius
-		dist = math.sqrt((poll.y - 300)**2 + (poll.x - 300)**2)
-		if(dist > 240):
-			print("COMPLETED")
-			poll.completed = True
-
-
-			# determine winner and add to list of winners
-			options = poll.options.split("|")
-			angle = float(math.atan2(poll.y - 300, poll.x-300))
-			if(angle < 0):
-				angle = math.pi * 2 + angle
-
-			a = float(math.pi * 2) / len(options)
-			print(angle, a)
-			winner = "__UNKNOWN__"
-			for index, o in enumerate(options):
-				begin = a * index
-				end = begin + a
-				if (angle >= begin and angle < end):
-					winner = o
-					break
-
-			poll.winners = poll.winners + winner + "|"
-
-			pusher.trigger(pid, "notify-status", {"status": "COMPLETED", "winners": poll.winners.split("|")})
-
+		voter.x = voter.x + int(offsetX)
+		voter.y = voter.y + int(offsetY)
+	
 		db_session.commit()
 
 		# push notification
 		#if (math.sqrt((poll.x - int(x))**2 + (poll.y - int(y))**2) > 50):
-		pusher.trigger(pid, "notify-move", {"x": poll.x, "y": poll.y})
+		#pusher.trigger(pid, "notify-move", {"x": poll.x, "y": poll.y})
 		
 		# get rid of this in response?
-		resp = jsonify(new_point = {"x": poll.x, "y": poll.y})	
+		resp = jsonify(new_point = {"x": voter.x, "y": voter.y})	
 		resp.headers['Access-Control-Allow-Origin'] = '*'
 		return resp, 200
 
@@ -127,15 +158,22 @@ def getPoll():
 
 	# get by pid
 	try:
+
 		poll = db_session.query(Poll).filter_by(pid=p).first()
 
-		
+		# create voter
+		voter = Voter(poll.id, poll.x, poll.y)
+		db_session.add(voter)
+		db_session.flush()
+		db_session.commit()
+
 		resp = jsonify(
 			data = {
 				"question": poll.question,
 				"options": poll.options.split("|"),
-				"x": poll.x,
-				"y": poll.y,
+				"x": voter.x,
+				"y": voter.y,
+				"vid": voter.id,
 				"viewers": poll.viewers,
 				"winners": poll.winners.split("|"),
 				"status": "COMPLETED" if poll.completed else ("STARTED" if poll.started else "WAITING")
@@ -205,6 +243,11 @@ def reset():
 		poll.x = 300
 		poll.y = 300
 
+		voters = db_session.query(Voter).filter_by(poll_id=poll.id).all()
+		for v in voters:
+			v.x = poll.x
+			v.y = poll.y
+
 		db_session.commit()
 		
 		#push message saying owner restarted
@@ -257,4 +300,6 @@ def shutdown_session(exception=None):
     db_session.remove()
 
 if __name__ == "__main__":
+	pulseNotify()
 	app.run()
+
